@@ -1,5 +1,6 @@
 package com.example.yngvi.inclassdrawingdemo;
 
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -7,6 +8,7 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
 import android.view.View;
 
 public class BoardView extends View {
@@ -51,12 +53,15 @@ public class BoardView extends View {
         int   boardHeight = (yNew - getPaddingTop() - getPaddingBottom());
         m_cellWidth = boardWidth / NUM_CELLS;
         m_cellHeight = boardHeight / NUM_CELLS;
+        m_circle.set(0, 0, m_cellWidth, m_cellHeight);
+        m_circle.inset(m_cellWidth * 0.1f, m_cellHeight * 0.1f);
+        m_circle.offset(getPaddingLeft(), getPaddingTop());
         //m_rect.set(0, 0, boardWidth, boardHeight );
         //m_rect.offset( getPaddingLeft(), getPaddingTop());
     }
 
     @Override
-    protected void onDraw( Canvas canvas ) {
+    protected void onDraw(Canvas canvas ) {
         canvas.drawRect(m_rect, m_paint);
 
         for ( int row = 0; row < NUM_CELLS; ++row ) {
@@ -68,11 +73,42 @@ public class BoardView extends View {
                 canvas.drawRect( m_rect, m_paint );
             }
         }
-
-        m_circle.set( 0, 0, m_cellWidth, m_cellHeight );
-        m_circle.offset( getPaddingLeft(), getPaddingTop() );
-        m_circle.inset( m_cellWidth * 0.1f, m_cellHeight * 0.1f );
-        canvas.drawOval( m_circle, m_paintCircle );
+        canvas.drawOval(m_circle, m_paintCircle);
     }
 
+    @Override
+    public boolean onTouchEvent( MotionEvent event ) {
+
+        int x = (int) event.getX();
+        int y = (int) event.getY();
+
+        if ( event.getAction() == MotionEvent.ACTION_DOWN ) {
+            //m_circle.offsetTo( x - m_circle.width() / 2, y - m_circle.height()/2 );
+            animateMovement( m_circle.left, m_circle.top,
+                             x - m_circle.width() / 2, y - m_circle.height()/2 );
+            invalidate();
+        }
+        return true;
+    }
+
+
+    ValueAnimator animator = new ValueAnimator();
+
+    private void animateMovement( final float xFrom, final float yFrom, final float xTo, final float yTo ) {
+        animator.removeAllUpdateListeners();
+        animator.setDuration(3000);
+        animator.setFloatValues(0.0f, 1.0f);
+        animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator animation) {
+                float ratio = (float) animation.getAnimatedValue();
+                int x = (int)( (1.0-ratio) * xFrom + ratio * xTo );
+                int y = (int)( (1.0-ratio) * yFrom + ratio * yTo );
+                m_circle.offsetTo( x, y );
+                invalidate();
+            }
+        });
+        animator.start();
+
+    }
 }
