@@ -7,5 +7,6 @@
         android:layout_height="wrap_content"
         android:background="#A0E0A0"
         android:padding="10pt"
+        android:layout_margin="10pt"
         />
 </LinearLayout>
