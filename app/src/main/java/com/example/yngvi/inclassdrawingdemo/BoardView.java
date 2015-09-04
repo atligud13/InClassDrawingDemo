@@ -5,24 +5,32 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Toast;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class BoardView extends View {
 
     private int m_cellWidth;
     private int m_cellHeight;
-
     private Rect m_rect = new Rect();
     private Paint m_paint = new Paint();
-
     private RectF m_circle = new RectF();
+    private Path m_path = new Path();
     private Paint m_paintCircle = new Paint();
-
+    private Paint m_paintPath = new Paint();
     private final int NUM_CELLS = 6;
+
+    private boolean m_moving = false;
+    private List<Point> m_cellPath = new ArrayList<Point>();
 
     public BoardView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -35,6 +43,10 @@ public class BoardView extends View {
         m_paintCircle.setStyle(Paint.Style.FILL_AND_STROKE);
         m_paintCircle.setAntiAlias(true);
 
+        m_paintPath.setColor(Color.BLUE);
+        m_paintPath.setStrokeWidth(10);
+        m_paintPath.setStyle(Paint.Style.STROKE);
+        m_paintPath.setAntiAlias(true);
     }
 
     @Override
@@ -73,7 +85,43 @@ public class BoardView extends View {
                 canvas.drawRect( m_rect, m_paint );
             }
         }
+
+        if(!m_cellPath.isEmpty()) {
+            m_path.reset();
+            Point point = m_cellPath.get(0);
+            m_path.moveTo(colToX(point.x) + m_cellWidth / 2, rowToY(point.y) + m_cellHeight / 2);
+            for(int i = 1; i < m_cellPath.size(); i++) {
+                point = m_cellPath.get(i);
+                m_path.lineTo(colToX(point.x) + m_cellWidth / 2, rowToY(point.y) + m_cellHeight / 2);
+            }
+            canvas.drawPath(m_path, m_paintPath);
+        }
+
         canvas.drawOval(m_circle, m_paintCircle);
+    }
+
+    private int xToCol(int x) {
+        return (x - getPaddingLeft()) / m_cellWidth;
+    }
+
+    private int yToRow(int y) {
+        return (y - getPaddingTop()) / m_cellHeight;
+    }
+
+    private int colToX(int col) {
+        return col * m_cellWidth + getPaddingLeft();
+    }
+
+    private int rowToY(int row) {
+        return row * m_cellHeight + getPaddingTop();
+    }
+
+    private void snapToGrid(RectF circle) {
+        int col = xToCol((int)circle.left);
+        int row = yToRow((int) circle.top);
+        float x = colToX(col) + (m_cellWidth - circle.width()) / 2;
+        float y = rowToY(row) + (m_cellHeight - circle.height()) / 2;
+        circle.offsetTo(x, y);
     }
 
     @Override
@@ -82,10 +130,40 @@ public class BoardView extends View {
         int x = (int) event.getX();
         int y = (int) event.getY();
 
+
+        int pepsiMax = getPaddingLeft() + m_cellWidth * NUM_CELLS;
+        int yMax = getPaddingTop() + m_cellHeight * NUM_CELLS;
+        x = Math.max(getPaddingLeft(), Math.min(x, (int) (pepsiMax - m_circle.width())));
+        y = Math.max(getPaddingTop(), Math.min(y, (int) (yMax - m_circle.height())));
+
         if ( event.getAction() == MotionEvent.ACTION_DOWN ) {
-            //m_circle.offsetTo( x - m_circle.width() / 2, y - m_circle.height()/2 );
-            animateMovement( m_circle.left, m_circle.top,
-                             x - m_circle.width() / 2, y - m_circle.height()/2 );
+            if( m_circle.contains(x, y) ) {
+                m_moving = true;
+                m_cellPath.add(new Point(xToCol(x), yToRow(y)));
+            } else {
+                animateMovement( m_circle.left, m_circle.top,
+                        x - m_circle.width() / 2, y - m_circle.height()/2 );
+            }
+            invalidate();
+        }
+        else if( event.getAction() == MotionEvent.ACTION_MOVE) {
+            if(m_moving){
+                if(!m_cellPath.isEmpty()){
+                    int col = xToCol(x);
+                    int row = yToRow(y);
+                    Point last = m_cellPath.get(m_cellPath.size() - 1);
+                    if( col != last.x || row != last.y) {
+                        m_cellPath.add(new Point(col, row));
+                    }
+                }
+                m_circle.offsetTo(x, y);
+                invalidate();
+            }
+        }
+        else if( event.getAction() == MotionEvent.ACTION_UP) {
+            m_moving = false;
+            snapToGrid(m_circle);
+            m_cellPath.clear();
             invalidate();
         }
         return true;
